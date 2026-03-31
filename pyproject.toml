@@ -1,40 +1,25 @@
-[tool.poetry]
+[project]
 name = "nonebot-plugin-doubao-draw"
-version = "0.1.4"
+version = "0.1.5"
 description = "豆包AI绘图插件，支持文生图和以图生图"
-authors = ["nwasvsad <njclt2005@163.com>"]
 license = "MIT"
-readme = "README.md"
-homepage = "https://github.com/nwasvsad/nonebot-plugin-doubao-draw"
-repository = "https://github.com/nwasvsad/nonebot-plugin-doubao-draw"
-keywords = ["nonebot", "nonebot2", "doubao", "ai", "draw", "image"]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Framework :: Robot Framework",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
+requires-python = ">=3.8"
+dependencies = [
+    "nonebot2>=2.0.0",
+    "nonebot-adapter-onebot>=2.0.0",
+    "openai>=1.0.0",
 ]
-packages = [{include = "nonebot_plugin_doubao_draw"}]
 
-[tool.poetry.dependencies]
-python = "^3.8"
-nonebot2 = ">=2.0.0"
-nonebot-adapter-onebot = ">=2.0.0"
-openai = ">=1.0.0"
+[project.urls]
+Homepage = "https://github.com/nwasvsad/nonebot-plugin-doubao-draw"
+Repository = "https://github.com/nwasvsad/nonebot-plugin-doubao-draw"
 
-[tool.poetry.group.dev.dependencies]
+[project.entry-points."nonebot.plugins"]
+nonebot_plugin_doubao_draw = "nonebot_plugin_doubao_draw"
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
-
-[tool.poetry.plugins."nonebot.plugins"]
-nonebot_plugin_doubao_draw = "nonebot_plugin_doubao_draw"
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [tool.nonebot]
 plugins = ["nonebot_plugin_doubao_draw"]
