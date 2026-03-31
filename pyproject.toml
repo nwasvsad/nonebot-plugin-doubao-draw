@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "nonebot-plugin-doubao-draw"
-version = "0.1.0"
+version = "0.1.4"
 description = "豆包AI绘图插件，支持文生图和以图生图"
 authors = ["nwasvsad <njclt2005@163.com>"]
 license = "MIT"
@@ -19,6 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
 ]
+packages = [{include = "nonebot_plugin_doubao_draw"}]
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -31,3 +32,10 @@ openai = ">=1.0.0"
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.plugins."nonebot.plugins"]
+nonebot_plugin_doubao_draw = "nonebot_plugin_doubao_draw"
+
+[tool.nonebot]
+plugins = ["nonebot_plugin_doubao_draw"]
+supported_adapters = ["~onebot.v11"]
