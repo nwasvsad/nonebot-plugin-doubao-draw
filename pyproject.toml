@@ -1,6 +1,6 @@
 [project]
 name = "nonebot-plugin-doubao-draw"
-version = "0.1.5"
+version = "0.1.6"
 description = "豆包AI绘图插件，支持文生图和以图生图"
 license = "MIT"
 requires-python = ">=3.8"
@@ -15,7 +15,7 @@ Homepage = "https://github.com/nwasvsad/nonebot-plugin-doubao-draw"
 Repository = "https://github.com/nwasvsad/nonebot-plugin-doubao-draw"
 
 [project.entry-points."nonebot.plugins"]
-nonebot_plugin_doubao_draw = "nonebot_plugin_doubao_draw"
+"nonebot-plugin-doubao-draw" = "nonebot_plugin_doubao_draw"
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
