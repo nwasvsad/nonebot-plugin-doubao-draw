@@ -4,23 +4,18 @@ from nonebot.params import CommandArg
 from nonebot.plugin import PluginMetadata
 import io
 
-from .config import Config
-from .service import DoubaoDrawService, MODEL
+from .doubao_config import Config
+from .doubao_service import DoubaoDrawService, MODEL
 from .prompt_store import get_prompt_store
 from .group_manager import get_group_manager
 
 __plugin_meta__ = PluginMetadata(
-    name="豆包AI绘图",
-    description="基于豆包Seedream API的AI绘图插件，支持文生图和以图生图",
+    name="doubao_draw",
+    description="豆包AI绘图插件",
     usage="发送 /绘图 <提示词> 即可生成图片\n"
           "/绘图 <提示词> 并附上图片可进行以图生图（支持多张图片）\n"
           "/绘图 <提示词> 并引用图片消息可基于引用图片生成\n"
           "/绘图帮助 查看帮助信息",
-    type="application",
-    homepage="https://github.com/nwasvsad/nonebot-plugin-doubao-draw",
-    config=Config,
-    supported_adapters={"~onebot.v11"},
-    tags=["ai", "draw", "image", "doubao"],
 )
 
 HELP_TEXT = """【豆包AI绘图插件帮助】
@@ -60,7 +55,8 @@ HELP_TEXT = """【豆包AI绘图插件帮助】
 - DOUBAO_DRAW_API_KEY: 豆包API密钥
 - DOUBAO_DRAW_ENABLED: 是否启用插件
 - DOUBAO_DRAW_SIZE: 图片尺寸(默认2K)
-- DOUBAO_DRAW_GROUPS: 启用的群号列表"""
+- DOUBAO_DRAW_GROUPS: 启用的群号列表
+- DOUBAO_DRAW_SUPERADMINS: 超级管理员列表"""
 
 driver = get_driver()
 _plugin_config = None
@@ -140,14 +136,13 @@ async def handle_help(event: GroupMessageEvent):
     await help_cmd.finish(HELP_TEXT)
 
 @prompt_cmd.handle()
-async def handle_prompt_list(event: GroupMessageEvent):
+async def handle_prompt_list(event: GroupMessageEvent, args: Message = CommandArg()):
     group_id = event.group_id
     if not is_draw_enabled_for_group(group_id):
         await prompt_cmd.finish()
     store = get_prompt_store()
-    args = event.get_plaintext().strip()
-    if args:
-        key = args
+    key = args.extract_plain_text().strip()
+    if key:
         value = store.get(key)
         if value is None:
             await prompt_cmd.finish(f"未找到提示词「{key}」")
@@ -162,16 +157,16 @@ async def handle_prompt_list(event: GroupMessageEvent):
         await prompt_cmd.finish("\n".join(lines))
 
 @prompt_add_cmd.handle()
-async def handle_prompt_add(event: GroupMessageEvent):
+async def handle_prompt_add(event: GroupMessageEvent, args: Message = CommandArg()):
     group_id = event.group_id
     if not is_draw_enabled_for_group(group_id):
         await prompt_add_cmd.finish()
-    args = event.get_plaintext().strip()
-    if not args or " " not in args:
+    raw = args.extract_plain_text().strip()
+    if not raw or " " not in raw:
         await prompt_add_cmd.finish("格式错误，请使用：/绘图提示词添加 <名称> <内容>")
-    idx = args.index(" ")
-    key = args[:idx].strip()
-    value = args[idx+1:].strip()
+    idx = raw.index(" ")
+    key = raw[:idx].strip()
+    value = raw[idx+1:].strip()
     if not key or not value:
         await prompt_add_cmd.finish("格式错误，请使用：/绘图提示词添加 <名称> <内容>")
     store = get_prompt_store()
@@ -182,11 +177,11 @@ async def handle_prompt_add(event: GroupMessageEvent):
     await prompt_add_cmd.finish(f"✅ 已添加提示词「{key}」")
 
 @prompt_del_cmd.handle()
-async def handle_prompt_del(event: GroupMessageEvent):
+async def handle_prompt_del(event: GroupMessageEvent, args: Message = CommandArg()):
     group_id = event.group_id
     if not is_draw_enabled_for_group(group_id):
         await prompt_del_cmd.finish()
-    key = event.get_plaintext().strip()
+    key = args.extract_plain_text().strip()
     if not key:
         await prompt_del_cmd.finish("请指定要删除的提示词名称")
     store = get_prompt_store()
@@ -197,26 +192,26 @@ async def handle_prompt_del(event: GroupMessageEvent):
     await prompt_del_cmd.finish(f"✅ 已删除提示词「{key}」")
 
 @admin_cmd.handle()
-async def handle_admin(event: GroupMessageEvent):
+async def handle_admin(event: GroupMessageEvent, args: Message = CommandArg()):
     group_id = event.group_id
     user_id = event.user_id
     if not is_superadmin(user_id):
         await admin_cmd.finish("仅超级管理员可使用此命令")
-    args = event.get_plaintext().strip()
+    cmd_arg = args.extract_plain_text().strip()
     gm = get_group_manager()
-    if args == "禁用":
+    if cmd_arg == "禁用":
         if gm.is_disabled(group_id):
             await admin_cmd.finish("当前群绘图功能已经禁用")
         gm.disable(group_id)
         logger.info(f"[DoubaoDraw] 禁用绘图，群:{group_id}，管理员:{user_id}")
         await admin_cmd.finish("✅ 已禁用当前群的绘图功能")
-    elif args == "启用":
+    elif cmd_arg == "启用":
         if not gm.is_disabled(group_id):
             await admin_cmd.finish("当前群绘图功能已经启用")
         gm.enable(group_id)
         logger.info(f"[DoubaoDraw] 启用绘图，群:{group_id}，管理员:{user_id}")
         await admin_cmd.finish("✅ 已启用当前群的绘图功能")
-    elif args == "状态":
+    elif cmd_arg == "状态":
         status = "已禁用" if gm.is_disabled(group_id) else "已启用"
         await admin_cmd.finish(f"当前群绘图功能：{status}")
     else:
