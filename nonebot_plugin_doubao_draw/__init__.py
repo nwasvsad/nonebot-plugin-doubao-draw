@@ -6,6 +6,8 @@ import io
 
 from .config import Config
 from .service import DoubaoDrawService, MODEL
+from .prompt_store import get_prompt_store
+from .group_manager import get_group_manager
 
 __plugin_meta__ = PluginMetadata(
     name="豆包AI绘图",
@@ -39,6 +41,21 @@ HELP_TEXT = """【豆包AI绘图插件帮助】
 4. /绘图帮助
    - 显示本帮助信息
 
+5. /绘图提示词
+   - 查看所有已保存的提示词模板
+
+6. /绘图提示词 <名称>
+   - 查看指定提示词的完整内容
+
+7. /绘图提示词添加 <名称> <内容>
+   - 添加新的提示词模板
+
+8. /绘图提示词删除 <名称>
+   - 删除指定的提示词模板
+
+9. /绘图管理 禁用/启用/状态
+   - 管理员：禁用或启用当前群的绘图功能
+
 配置项：
 - DOUBAO_DRAW_API_KEY: 豆包API密钥
 - DOUBAO_DRAW_ENABLED: 是否启用插件
@@ -66,8 +83,21 @@ def is_draw_enabled_for_group(group_id: int) -> bool:
     if not cfg.doubao_draw_enabled:
         return False
     if not cfg.doubao_draw_groups:
-        return True
-    return group_id in cfg.doubao_draw_groups
+        pass
+    elif group_id not in cfg.doubao_draw_groups:
+        return False
+    gm = get_group_manager()
+    if gm.is_disabled(group_id):
+        return False
+    return True
+
+def is_superadmin(user_id: int) -> bool:
+    cfg = get_plugin_config()
+    superadmins = set(cfg.doubao_draw_superadmins)
+    driver = get_driver()
+    if hasattr(driver.config, "superusers"):
+        superadmins.update(driver.config.superusers)
+    return str(user_id) in superadmins
 
 def get_all_attached_images(event: GroupMessageEvent) -> list:
     images = []
@@ -97,6 +127,10 @@ def format_cost(cost: float) -> str:
 
 draw_cmd = on_command("绘图", priority=5, block=True)
 help_cmd = on_command("绘图帮助", priority=5, block=True)
+prompt_cmd = on_command("绘图提示词", priority=5, block=True)
+prompt_add_cmd = on_command("绘图提示词添加", priority=5, block=True)
+prompt_del_cmd = on_command("绘图提示词删除", priority=5, block=True)
+admin_cmd = on_command("绘图管理", priority=5, block=True)
 
 @help_cmd.handle()
 async def handle_help(event: GroupMessageEvent):
@@ -104,6 +138,89 @@ async def handle_help(event: GroupMessageEvent):
     if not is_draw_enabled_for_group(group_id):
         await help_cmd.finish()
     await help_cmd.finish(HELP_TEXT)
+
+@prompt_cmd.handle()
+async def handle_prompt_list(event: GroupMessageEvent):
+    group_id = event.group_id
+    if not is_draw_enabled_for_group(group_id):
+        await prompt_cmd.finish()
+    store = get_prompt_store()
+    args = event.get_plaintext().strip()
+    if args:
+        key = args
+        value = store.get(key)
+        if value is None:
+            await prompt_cmd.finish(f"未找到提示词「{key}」")
+        await prompt_cmd.finish(f"📝 {key}:\n{value}")
+    else:
+        all_prompts = store.get_all()
+        if not all_prompts:
+            await prompt_cmd.finish("暂无保存的提示词")
+        lines = ["📚 已保存的提示词模板："]
+        for k in all_prompts:
+            lines.append(f"- {k}")
+        await prompt_cmd.finish("\n".join(lines))
+
+@prompt_add_cmd.handle()
+async def handle_prompt_add(event: GroupMessageEvent):
+    group_id = event.group_id
+    if not is_draw_enabled_for_group(group_id):
+        await prompt_add_cmd.finish()
+    args = event.get_plaintext().strip()
+    if not args or " " not in args:
+        await prompt_add_cmd.finish("格式错误，请使用：/绘图提示词添加 <名称> <内容>")
+    idx = args.index(" ")
+    key = args[:idx].strip()
+    value = args[idx+1:].strip()
+    if not key or not value:
+        await prompt_add_cmd.finish("格式错误，请使用：/绘图提示词添加 <名称> <内容>")
+    store = get_prompt_store()
+    if store.exists(key):
+        await prompt_add_cmd.finish(f"提示词「{key}」已存在，请使用其他名称")
+    store.add(key, value)
+    logger.info(f"[DoubaoDraw] 添加提示词，群:{group_id}，名称:{key}")
+    await prompt_add_cmd.finish(f"✅ 已添加提示词「{key}」")
+
+@prompt_del_cmd.handle()
+async def handle_prompt_del(event: GroupMessageEvent):
+    group_id = event.group_id
+    if not is_draw_enabled_for_group(group_id):
+        await prompt_del_cmd.finish()
+    key = event.get_plaintext().strip()
+    if not key:
+        await prompt_del_cmd.finish("请指定要删除的提示词名称")
+    store = get_prompt_store()
+    if not store.exists(key):
+        await prompt_del_cmd.finish(f"提示词「{key}」不存在")
+    store.delete(key)
+    logger.info(f"[DoubaoDraw] 删除提示词，群:{group_id}，名称:{key}")
+    await prompt_del_cmd.finish(f"✅ 已删除提示词「{key}」")
+
+@admin_cmd.handle()
+async def handle_admin(event: GroupMessageEvent):
+    group_id = event.group_id
+    user_id = event.user_id
+    if not is_superadmin(user_id):
+        await admin_cmd.finish("仅超级管理员可使用此命令")
+    args = event.get_plaintext().strip()
+    gm = get_group_manager()
+    if args == "禁用":
+        if gm.is_disabled(group_id):
+            await admin_cmd.finish("当前群绘图功能已经禁用")
+        gm.disable(group_id)
+        logger.info(f"[DoubaoDraw] 禁用绘图，群:{group_id}，管理员:{user_id}")
+        await admin_cmd.finish("✅ 已禁用当前群的绘图功能")
+    elif args == "启用":
+        if not gm.is_disabled(group_id):
+            await admin_cmd.finish("当前群绘图功能已经启用")
+        gm.enable(group_id)
+        logger.info(f"[DoubaoDraw] 启用绘图，群:{group_id}，管理员:{user_id}")
+        await admin_cmd.finish("✅ 已启用当前群的绘图功能")
+    elif args == "状态":
+        status = "已禁用" if gm.is_disabled(group_id) else "已启用"
+        await admin_cmd.finish(f"当前群绘图功能：{status}")
+    else:
+        await admin_cmd.finish("格式错误，请使用：/绘图管理 禁用/启用/状态")
 
 @draw_cmd.handle()
 async def handle_draw(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):

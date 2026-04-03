@@ -1,6 +1,6 @@
 [project]
 name = "nonebot-plugin-doubao-draw"
-version = "0.1.6"
+version = "0.2.1"
 description = "豆包AI绘图插件，支持文生图和以图生图"
 license = "MIT"
 requires-python = ">=3.8"
